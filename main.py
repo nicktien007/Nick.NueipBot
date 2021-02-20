@@ -18,6 +18,7 @@ class Checker:
         if self.save_day == self.get_today() \
                 and not self.has_clocked_out:
             self.main()
+            return
 
         if self.save_day == self.get_today() \
                 and self.has_clocked_out:
@@ -26,6 +27,7 @@ class Checker:
         self.new_day()
 
     def new_day(self):
+        print("call new_day")
         self.save_day = self.get_today()
         self.has_clocked_out = False
 
@@ -62,22 +64,25 @@ class Checker:
             return
 
         # 有上班卡，沒下班卡，要用現在時間檢查
-        if ed is None:
+        if ed is None \
+                and not self.has_clocked_out:
             ed_f = self.to_ed_f(ed)
             off_work_time = self.get_off_work_time(sd_f)
-            if off_work_time < ed_f:
+            if ed_f > off_work_time:
                 pync.notify('嗶嗶嗶~~~!!快點打卡!!')
                 return
 
-        # 已經打上班卡、下班卡，檢查工時有無8小時
-        if ed is not None and sd is not None and not self.has_clocked_out:
+        # 已經打上班卡、下班卡，檢查打卡時間是否在下班時間之後
+        if ed is not None \
+                and sd is not None \
+                and not self.has_clocked_out:
             ed_f = self.to_ed_f(ed)
             off_work_time = self.get_off_work_time(sd_f)
-            if off_work_time < ed_f:
+            if off_work_time > ed_f:
                 pync.notify('嗶嗶嗶~~~!!快點打卡!!')
                 return
 
-        print("標記為已打卡")
+        pync.notify(f'已經打下班卡了({ed})~~~SAFE!!!!!')
         self.has_clocked_out = True
 
     def show_info(self, ed, sd):
@@ -87,9 +92,16 @@ class Checker:
         print(f'上班卡:{sd}')
         print(f'下班卡:{ed}')
         print(f'預計下班:{off_work_time}')
-        print(f'今日工時:{ed_f - sd_f}')
-        # print(f'今日工時:{(ed_f - sd_f) - timedelta(hours=1)}')
+        print(f'今日工時:{self.get_working_hours(ed_f, sd_f)}')
         print('===============')
+
+    def get_working_hours(self, ed_f, sd_f):
+        now = datetime.now()
+
+        if now > datetime(now.year,now.month,now.day,13,30):
+            return (ed_f - sd_f) - timedelta(hours=1)
+
+        return ed_f - sd_f
 
     def get_response(self):
         url = "https://cloud.nueip.com/attendance_record/ajax"
@@ -98,7 +110,6 @@ class Checker:
                    'loadBatchGroupNum': '6000',
                    'loadBatchNumber': '1',
                    'work_status': '1,4'}
-        # now_date = self.get_today()
         now_date = self.save_day
         headers = {
             'authority': 'cloud.nueip.com',
@@ -192,5 +203,5 @@ if __name__ == '__main__':
     c = Checker()
     while True:
         c.run()
-        sleep(10)
-        # sleep(300)
+        # sleep(10)
+        sleep(300)
